@@ -345,16 +345,16 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         noise = latents.clone()
 
         # 8. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
-        extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
+        extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta) # 没特别操作
 
         # 9. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         self._num_timesteps = len(timesteps)
 
         _, spatial_attn_outputs = self.unet_garm(
-            garm_latents,
-            0,
-            encoder_hidden_states=prompt_embeds,
+            garm_latents,                        # vae.encoded
+            0,                                   # set timestep = 0
+            encoder_hidden_states=prompt_embeds, # clip.encode(garment), 以及model_type == 'DC'时，则拼上 clip.text_encode(上衣|裤|裙)
             return_dict=False,
         )
 
@@ -367,14 +367,14 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                 latent_vton_model_input = torch.cat([scaled_latent_model_input, vton_latents], dim=1)
                 # latent_vton_model_input = scaled_latent_model_input + vton_latents
 
-                spatial_attn_inputs = spatial_attn_outputs.copy()
+                spatial_attn_inputs = spatial_attn_outputs.copy() # garment 经 unet 所抽取 
 
                 # predict the noise residual
                 noise_pred = self.unet_vton(
                     latent_vton_model_input,
-                    spatial_attn_inputs,
-                    t,
-                    encoder_hidden_states=prompt_embeds,
+                    spatial_attn_inputs,                 # garment 经 unet 所抽取 
+                    t,                                   # timestep
+                    encoder_hidden_states=prompt_embeds, # clip.encode(garment), 以及model_type == 'DC'时，则拼上 clip.text_encode(上衣|裤|裙)
                     return_dict=False,
                 )[0]
 
@@ -389,10 +389,9 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
 
                 # perform guidance
                 if self.do_classifier_free_guidance:
-                    noise_pred_text_image, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred_text_image, noise_pred_text = noise_pred.chunk(2) # noise_pred_text_image：条件生成结果，noise_pred_text：非条件生成结果
                     noise_pred = (
-                        noise_pred_text
-                        + self.image_guidance_scale * (noise_pred_text_image - noise_pred_text)
+                        noise_pred_text + self.image_guidance_scale * (noise_pred_text_image - noise_pred_text) # uncond_eps + CFG * (cond_eps - uncond_eps) 
                     )
 
                 # Hack:
@@ -402,12 +401,12 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                 # need to overwrite the noise_pred here such that the value of the computed
                 # predicted_original_sample is correct.
                 if scheduler_is_in_sigma_space:
-                    noise_pred = (noise_pred - latents) / (-sigma)
+                    noise_pred = (noise_pred - latents) / (-sigma) # 前面的 noise_pred = latent_model_input - sigma * noise_pred 的逆
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0] # 得到了新的latent
 
-                init_latents_proper = image_ori_latents * self.vae.config.scaling_factor
+                init_latents_proper = image_ori_latents * self.vae.config.scaling_factor # scaling_factor == 0.18215, SD vae 默认即取此值
 
                 # repainting
                 if i < len(timesteps) - 1:
@@ -416,7 +415,10 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                         init_latents_proper, noise, torch.tensor([noise_timestep])
                     )
 
-                latents = (1 - mask_latents) * init_latents_proper + mask_latents * latents
+                latents = (1 - mask_latents) * init_latents_proper + mask_latents * latents # 把要保留部分(用户照片不算衣服部分，包括背景以及手脚脸等)复制过来，和生成的衣服部分，作融合。SD作inpainting就可以这样做
+                                                                                            # 经在一张图片上试验，即使把这行去掉，生成的也不差，甚至看不出区别。但是这样操作确实可以对要保留部分作强保证
+                
+                # 循环的下一轮，就用此新的latent
 
                 if callback_on_step_end is not None:
                     callback_kwargs = {}
