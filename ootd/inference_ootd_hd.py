@@ -28,7 +28,9 @@ VIT_PATH = "../checkpoints/clip-vit-large-patch14"
 VAE_PATH = "../checkpoints/ootd"
 UNET_PATH = "../checkpoints/ootd/ootd_hd/checkpoint-36000"
 MODEL_PATH = "../checkpoints/ootd"
-
+'''
+本文件和inference_ootd.py， inference_ootd_dc.py 几乎没区别。只是上面的常量定义(UNET_PATH)取值有差异
+'''
 class OOTDiffusionHD:
 
     def __init__(self, gpu_id):
@@ -109,12 +111,16 @@ class OOTDiffusionHD:
             prompt_image = self.auto_processor(images=image_garm, return_tensors="pt").to(self.gpu_id)
             prompt_image = self.image_encoder(prompt_image.data['pixel_values']).image_embeds
             prompt_image = prompt_image.unsqueeze(1)
+            # 上面把 garment image 经clip提取到特征, shape == [1, 1, 768]
+            
             if model_type == 'hd':
-                prompt_embeds = self.text_encoder(self.tokenize_captions([""], 2).to(self.gpu_id))[0]
+                prompt_embeds = self.text_encoder(self.tokenize_captions([""], max_length=2).to(self.gpu_id))[0]  # shape = [1, 2, 768]
                 prompt_embeds[:, 1:] = prompt_image[:]
+                # 只用 img CLIP 特征。注意img clip 与文本clip两者是在同一个空间的
             elif model_type == 'dc':
-                prompt_embeds = self.text_encoder(self.tokenize_captions([category], 3).to(self.gpu_id))[0]
+                prompt_embeds = self.text_encoder(self.tokenize_captions([category], max_length=3).to(self.gpu_id))[0]
                 prompt_embeds = torch.cat([prompt_embeds, prompt_image], dim=1)
+                # img clip 与 category text clip 拼合
             else:
                 raise ValueError("model_type must be \'hd\' or \'dc\'!")
 
