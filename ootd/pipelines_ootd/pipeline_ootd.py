@@ -288,10 +288,10 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         )
 
         # 3. Preprocess image
-        image_garm = self.image_processor.preprocess(image_garm)
-        image_vton = self.image_processor.preprocess(image_vton)
+        image_garm = self.image_processor.preprocess(image_garm) # 衣服图
+        image_vton = self.image_processor.preprocess(image_vton) # 待换装的人图片，上衣部分被涂抹掉了
         image_ori = self.image_processor.preprocess(image_ori)
-        mask = np.array(mask)
+        mask = np.array(mask) # 和 image_vton 中被涂抹掉的部分正对应
         mask[mask < 127] = 0
         mask[mask >= 127] = 255
         mask = torch.tensor(mask)
@@ -302,8 +302,8 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         self.scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps = self.scheduler.timesteps
 
-        # 5. Prepare Image latents
-        garm_latents = self.prepare_garm_latents(
+        # 5. Prepare Image latents # 即作vae.encode
+        garm_latents = self.prepare_garm_latents( # vae.encode, 以及CFG则拼zero tensor
             image_garm,
             batch_size,
             num_images_per_prompt,
@@ -313,7 +313,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
             generator,
         )
 
-        vton_latents, mask_latents, image_ori_latents = self.prepare_vton_latents(
+        vton_latents, mask_latents, image_ori_latents = self.prepare_vton_latents( # vae.encode, 以及CFG则拼zero tensor
             image_vton,
             mask,
             image_ori,
@@ -326,12 +326,12 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         )
 
         height, width = vton_latents.shape[-2:]
-        height = height * self.vae_scale_factor
+        height = height * self.vae_scale_factor # scale factor == 8, vae 放大8倍 (64x64=>512x512)
         width = width * self.vae_scale_factor
 
         # 6. Prepare latent variables
         num_channels_latents = self.vae.config.latent_channels
-        latents = self.prepare_latents(
+        latents = self.prepare_latents( # 若没提供则生成一个，否则用提供的
             batch_size * num_images_per_prompt,
             num_channels_latents,
             height,
@@ -682,6 +682,9 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, device, generator, latents=None):
+        '''
+        若参数中没提供latents，当初生成一个
+        '''
         shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
@@ -695,10 +698,13 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
             latents = latents.to(device)
 
         # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * self.scheduler.init_noise_sigma
+        latents = latents * self.scheduler.init_noise_sigma # init noise_sigma == 1
         return latents
 
     def prepare_garm_latents(
+        '''
+        对衣服作VAE encode，如果作classifier guidance, 则会额外拼zero tensor
+        '''
         self, image, batch_size, num_images_per_prompt, dtype, device, do_classifier_free_guidance, generator=None
     ):
         if not isinstance(image, (torch.Tensor, PIL.Image.Image, list)):
@@ -742,6 +748,9 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         return image_latents
     
     def prepare_vton_latents(
+        '''
+        对image, image_ori分别作vae.encode, 如果 do_classifier_free_guidance，则对 image_latent 拼 zero tensor
+        '''
         self, image, mask, image_ori, batch_size, num_images_per_prompt, dtype, device, do_classifier_free_guidance, generator=None
     ):
         if not isinstance(image, (torch.Tensor, PIL.Image.Image, list)):
