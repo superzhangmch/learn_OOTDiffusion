@@ -313,6 +313,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
             generator,
         )
 
+        # image_ori, mask 的作用：是为了在多步生成时，每步都能以inpainting方式把需要保留的图片部分 copy & paste过去
         vton_latents, mask_latents, image_ori_latents = self.prepare_vton_latents( # vae.encode, 以及CFG则拼zero tensor
             image_vton,
             mask,
@@ -411,9 +412,9 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                 # repainting
                 if i < len(timesteps) - 1:
                     noise_timestep = timesteps[i + 1]
-                    init_latents_proper = self.scheduler.add_noise(
-                        init_latents_proper, noise, torch.tensor([noise_timestep])
-                    )
+
+                    # init_latents_proper是清晰的原图，下面要用之和生成的衣服作merge，所以需要对之先加噪到第t步的噪声等级，然后才和第t部的生成结果作合并
+                    init_latents_proper = self.scheduler.add_noise(init_latents_proper, noise, torch.tensor([noise_timestep])) 
 
                 latents = (1 - mask_latents) * init_latents_proper + mask_latents * latents # 把要保留部分(用户照片不算衣服部分，包括背景以及手脚脸等)复制过来，和生成的衣服部分，作融合。SD作inpainting就可以这样做
                                                                                             # 经在一张图片上试验，即使把这行去掉，生成的也不差，甚至看不出区别。但是这样操作确实可以对要保留部分作强保证
@@ -440,7 +441,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
 
         if not output_type == "latent":
             image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False)[0]
-            image, has_nsfw_concept = self.run_safety_checker(image, device, prompt_embeds.dtype)
+            image, has_nsfw_concept = self.run_safety_checker(image, device, prompt_embeds.dtype) # nsfw=not safe for work, 少儿不宜
         else:
             image = latents
             has_nsfw_concept = None
@@ -591,6 +592,8 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
     def run_safety_checker(self, image, device, dtype):
+        ''' 黄反检测
+        '''
         if self.safety_checker is None:
             has_nsfw_concept = None
         else:
