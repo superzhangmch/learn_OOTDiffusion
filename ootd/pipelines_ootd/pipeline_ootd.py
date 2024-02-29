@@ -282,9 +282,9 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
             device,
             num_images_per_prompt,
             self.do_classifier_free_guidance,
-            negative_prompt,
+            negative_prompt,  # None
             prompt_embeds=prompt_embeds,
-            negative_prompt_embeds=negative_prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds, # None
         )
 
         # 3. Preprocess image
