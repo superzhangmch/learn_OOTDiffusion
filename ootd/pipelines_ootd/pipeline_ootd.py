@@ -502,7 +502,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         else:
             batch_size = prompt_embeds.shape[0]
 
-        if prompt_embeds is None:
+        if prompt_embeds is None: # 不会跑进此分支
             # textual inversion: procecss multi-vector tokens if necessary
             if isinstance(self, TextualInversionLoaderMixin):
                 prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
@@ -550,7 +550,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
             if negative_prompt is None:
-                uncond_tokens = [""] * batch_size
+                uncond_tokens = [""] * batch_size # 命中此分支
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
@@ -586,7 +586,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                 attention_mask = None
 
         if do_classifier_free_guidance:
-            prompt_embeds = torch.cat([prompt_embeds, prompt_embeds])
+            prompt_embeds = torch.cat([prompt_embeds, prompt_embeds]) # 这段有问题
 
         return prompt_embeds
 
