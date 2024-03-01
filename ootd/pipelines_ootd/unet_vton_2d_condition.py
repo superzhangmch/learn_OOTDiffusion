@@ -1079,7 +1079,8 @@ class UNetVton2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
 
                 sample, res_samples, spatial_attn_inputs, spatial_attn_idx = downsample_block(
                     hidden_states=sample,
-                    spatial_attn_inputs=spatial_attn_inputs,
+                    spatial_attn_inputs=spatial_attn_inputs, # spatial_attn_inputs[spatial_attn_idx] 拿到的就是garment Unet 提取到的对应衣服信息，用来和vton Unet对应位置处做attention的(做法是：拼合后做self attention，而不是cross attn)。 
+                                                             # spatial_attn_idx传进去后返回出来，内部会+1, 而spatial_attn_inputs则保持不变
                     spatial_attn_idx=spatial_attn_idx,
                     temb=emb,
                     encoder_hidden_states=encoder_hidden_states,
