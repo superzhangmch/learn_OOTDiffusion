@@ -547,7 +547,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
 
         # get unconditional embeddings for classifier free guidance
-        if do_classifier_free_guidance and negative_prompt_embeds is None:
+        if do_classifier_free_guidance and negative_prompt_embeds is None: # 会跑进这个分支
             uncond_tokens: List[str]
             if negative_prompt is None:
                 uncond_tokens = [""] * batch_size # 命中此分支
@@ -586,7 +586,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                 attention_mask = None
 
         if do_classifier_free_guidance:
-            prompt_embeds = torch.cat([prompt_embeds, prompt_embeds]) # 这段有问题
+            prompt_embeds = torch.cat([prompt_embeds, prompt_embeds]) # 按上面，其实会拿到uncond_input的，但是没用。据issue里作者的回复，这里确实不希望做classifier guidance
 
         return prompt_embeds
 
