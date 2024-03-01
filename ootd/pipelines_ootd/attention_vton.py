@@ -165,7 +165,7 @@ class BasicTransformerBlock(nn.Module):
             dim_head=attention_head_dim,
             dropout=dropout,
             bias=attention_bias,
-            cross_attention_dim=cross_attention_dim if only_cross_attention else None,
+            cross_attention_dim=cross_attention_dim if only_cross_attention else None, # None
             upcast_attention=upcast_attention,
         )
 
@@ -181,7 +181,7 @@ class BasicTransformerBlock(nn.Module):
             )
             self.attn2 = Attention(
                 query_dim=dim,
-                cross_attention_dim=cross_attention_dim if not double_self_attention else None,
+                cross_attention_dim=cross_attention_dim if not double_self_attention else None, # self.attn1 self.attn2 只这里有区别，attn1=None，attn2=768
                 heads=num_attention_heads,
                 dim_head=attention_head_dim,
                 dropout=dropout,
@@ -218,10 +218,10 @@ class BasicTransformerBlock(nn.Module):
     def forward(
         self,
         hidden_states: torch.FloatTensor,
-        spatial_attn_inputs = [],
+        spatial_attn_inputs = [],  #  拿到spatial_attn_inputs[spatial_attn_idx] 来做attn
         spatial_attn_idx = 0,
-        attention_mask: Optional[torch.FloatTensor] = None,
-        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,        # None
+        encoder_hidden_states: Optional[torch.FloatTensor] = None, # 衣服clip image 编码。shape=[2, 2, 768]，因作classifier guidance，故第一维取值2
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
         timestep: Optional[torch.LongTensor] = None,
         cross_attention_kwargs: Dict[str, Any] = None,
@@ -233,7 +233,7 @@ class BasicTransformerBlock(nn.Module):
 
         spatial_attn_input = spatial_attn_inputs[spatial_attn_idx]
         spatial_attn_idx += 1
-        hidden_states = torch.cat((hidden_states, spatial_attn_input), dim=1)
+        hidden_states = torch.cat((hidden_states, spatial_attn_input), dim=1) # 把garment Unet而来的信息，与这里Unet的拼接，以便下面作atten
 
         if self.use_ada_layer_norm:
             norm_hidden_states = self.norm1(hidden_states, timestep)
@@ -263,9 +263,9 @@ class BasicTransformerBlock(nn.Module):
         cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
         gligen_kwargs = cross_attention_kwargs.pop("gligen", None)
 
-        attn_output = self.attn1(
-            norm_hidden_states,
-            encoder_hidden_states=encoder_hidden_states if self.only_cross_attention else None,
+        attn_output = self.attn1( # self attn
+            norm_hidden_states,   # query
+            encoder_hidden_states=encoder_hidden_states if self.only_cross_attention else None, # ==None 故是self attn, (self.only_cross_attention == False), key-value
             attention_mask=attention_mask,
             **cross_attention_kwargs,
         )
@@ -275,8 +275,8 @@ class BasicTransformerBlock(nn.Module):
             attn_output = gate_msa * attn_output
 
         
-        hidden_states = attn_output + hidden_states
-        hidden_states, _ = hidden_states.chunk(2, dim=1)
+        hidden_states = attn_output + hidden_states # residual 
+        hidden_states, _ = hidden_states.chunk(2, dim=1) # 经过self-attn后只取前半，不用后半是因为后一半是关于garment 那个Unet的spatial_attn_input的self-attn结果，与这里关注的东西毫不相干
 
         if hidden_states.ndim == 4:
             hidden_states = hidden_states.squeeze(1)
@@ -301,9 +301,9 @@ class BasicTransformerBlock(nn.Module):
             if self.pos_embed is not None and self.use_ada_layer_norm_single is False:
                 norm_hidden_states = self.pos_embed(norm_hidden_states)
 
-            attn_output = self.attn2(
-                norm_hidden_states,
-                encoder_hidden_states=encoder_hidden_states,
+            attn_output = self.attn2( # cross attn。并没和spatial_attn_input做cross attn，而是spatial_attn_input已经通过前面的self-attn融入了norm_hidden_states了
+                norm_hidden_states,  # query
+                encoder_hidden_states=encoder_hidden_states, # key-value
                 attention_mask=encoder_attention_mask,
                 **cross_attention_kwargs,
             )
