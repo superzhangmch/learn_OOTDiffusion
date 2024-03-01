@@ -1076,7 +1076,7 @@ class UNetGarm2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
                 if is_adapter and len(down_intrablock_additional_residuals) > 0:
                     additional_residuals["additional_residuals"] = down_intrablock_additional_residuals.pop(0)
 
-                sample, res_samples, spatial_attn_inputs = downsample_block(
+                sample, res_samples, spatial_attn_inputs = downsample_block( # 把cross attn处的中间结果拿出来，要传给换衣Unet
                     hidden_states=sample,
                     spatial_attn_inputs=spatial_attn_inputs,
                     temb=emb,
@@ -1111,7 +1111,7 @@ class UNetGarm2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
         # 4. mid
         if self.mid_block is not None:
             if hasattr(self.mid_block, "has_cross_attention") and self.mid_block.has_cross_attention:
-                sample, spatial_attn_inputs = self.mid_block(
+                sample, spatial_attn_inputs = self.mid_block( # 把cross attn处的中间结果拿出来，要传给换衣Unet
                     sample,
                     spatial_attn_inputs=spatial_attn_inputs,
                     temb=emb,
@@ -1147,7 +1147,7 @@ class UNetGarm2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
                 upsample_size = down_block_res_samples[-1].shape[2:]
 
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
-                sample, spatial_attn_inputs = upsample_block(
+                sample, spatial_attn_inputs = upsample_block( # 把cross attn处的中间结果拿出来，要传给换衣Unet
                     hidden_states=sample,
                     spatial_attn_inputs=spatial_attn_inputs,
                     temb=emb,
