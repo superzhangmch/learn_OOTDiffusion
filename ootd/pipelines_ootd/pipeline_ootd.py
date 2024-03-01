@@ -373,7 +373,8 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
                 # predict the noise residual
                 noise_pred = self.unet_vton(
                     latent_vton_model_input,
-                    spatial_attn_inputs,                 # garment 经 unet 所抽取 
+                    spatial_attn_inputs,                 # garment 经 unet 所抽取, 内部会和unet_vton 作cross attention（做法是：两个unet同构，所以可以一一对应，对于每处attention处可以把两者结合起来。
+                                                         # 结合方式是：两者拼合后做self attention，然后只保留unet_vton的那部分。并没作两者间的cross attn）
                     t,                                   # timestep
                     encoder_hidden_states=prompt_embeds, # clip.encode(garment), 以及model_type == 'DC'时，则拼上 clip.text_encode(上衣|裤|裙)
                     return_dict=False,
