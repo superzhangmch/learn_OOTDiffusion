@@ -1078,7 +1078,7 @@ class UNetGarm2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
 
                 sample, res_samples, spatial_attn_inputs = downsample_block( # 把cross attn处的中间结果拿出来，要传给换衣Unet
                     hidden_states=sample,
-                    spatial_attn_inputs=spatial_attn_inputs,
+                    spatial_attn_inputs=spatial_attn_inputs, # 把spatial_attn_inputs传进去，再返回来，在内部操作上只是对它append了东西（append了attenion的input）。下同
                     temb=emb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
