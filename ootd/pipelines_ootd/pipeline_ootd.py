@@ -281,7 +281,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
             prompt,
             device,
             num_images_per_prompt,
-            self.do_classifier_free_guidance,
+            self.do_classifier_free_guidance, # 这里对于CLIP encode：即使需要做cfg，也并没拼zero，而是自身重复
             negative_prompt,  # None
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds, # None
@@ -314,7 +314,7 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         )
 
         # image_ori, mask 的作用：是为了在多步生成时，每步都能以inpainting方式把需要保留的图片部分 copy & paste过去
-        vton_latents, mask_latents, image_ori_latents = self.prepare_vton_latents( # vae.encode, 以及CFG则拼zero tensor
+        vton_latents, mask_latents, image_ori_latents = self.prepare_vton_latents( # vae.encode, 以及若CFG则拼vton_latents拼zero tensor
             image_vton,
             mask,
             image_ori,
