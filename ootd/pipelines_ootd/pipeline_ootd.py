@@ -754,9 +754,8 @@ class OotdPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMix
         return image_latents
     
     def prepare_vton_latents(
-        '''
-        对image, image_ori分别作vae.encode, 如果 do_classifier_free_guidance，则对 image_latent 拼 zero tensor
-        '''
+        #  对image, image_ori分别作vae.encode, 如果 do_classifier_free_guidance，则对 image.vae_latent 拼 zero tensor
+        # 参数 image: 待换装的人图片，上衣部分被涂抹掉了
         self, image, mask, image_ori, batch_size, num_images_per_prompt, dtype, device, do_classifier_free_guidance, generator=None
     ):
         if not isinstance(image, (torch.Tensor, PIL.Image.Image, list)):
