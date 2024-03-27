@@ -960,7 +960,8 @@ class UNetVton2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
                 emb = torch.cat([emb, class_emb], dim=-1)
             else:
                 emb = emb + class_emb
-
+                
+        # 下面这一组的if-elif-elif..各分支，都不会跑到
         if self.config.addition_embed_type == "text":
             aug_emb = self.add_embedding(encoder_hidden_states)
         elif self.config.addition_embed_type == "text_image":
@@ -1013,7 +1014,8 @@ class UNetVton2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
 
         if self.time_embed_act is not None:
             emb = self.time_embed_act(emb)
-
+            
+        # 下面这一组的if-elif-elif..各分支，都不会跑到。所以 encoder_hidden_states 取值不会被改变
         if self.encoder_hid_proj is not None and self.config.encoder_hid_dim_type == "text_proj":
             encoder_hidden_states = self.encoder_hid_proj(encoder_hidden_states)
         elif self.encoder_hid_proj is not None and self.config.encoder_hid_dim_type == "text_image_proj":
