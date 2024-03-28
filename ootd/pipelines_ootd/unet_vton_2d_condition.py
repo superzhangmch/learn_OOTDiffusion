@@ -911,6 +911,7 @@ class UNetVton2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMi
         if encoder_attention_mask is not None:
             encoder_attention_mask = (1 - encoder_attention_mask.to(sample.dtype)) * -10000.0
             encoder_attention_mask = encoder_attention_mask.unsqueeze(1)
+        # 上面 attention_mask is None, encoder_attention_mask。对后者，OOTD中即使把text prompt拼进去的时候，也是拼了固定长度，所以该mask可以为空
 
         # 0. center input if necessary
         if self.config.center_input_sample:
